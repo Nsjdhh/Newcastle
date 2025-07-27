@@ -21,3 +21,5 @@ def start(message):
     bot.send_message(message.chat.id, "✅ Бот работает!")
 
 bot.polling()
+import os
+print("BOT_TOKEN из окружения:", os.environ.get("BOT_TOKEN"))
