@@ -60,6 +60,18 @@ cars = {
 @bot.message_handler(commands=["start", "профиль"])
 def profile(message):
     user = get_user(message.from_user.id)
+
+    # 📱 Кнопки
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("🚗 Автосалон", "🚘 Гараж")
+    markup.row("💼 Профиль")
+
+    bot.send_message(
+        message.chat.id,
+        f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽",
+        reply_markup=markup
+    )
+    user = get_user(message.from_user.id)
     bot.send_message(message.chat.id, f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽")
 
 @bot.message_handler(commands=["гараж"])
