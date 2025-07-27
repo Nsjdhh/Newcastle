@@ -26,15 +26,15 @@ def start(message):
     bot.send_message(message.chat.id, "✅ Бот работает!")
 
 # Запускаем бота
-bot.polling() import telebot
-from telebot import types
-import random
+bot.polling() import os
 import json
-import os
+import random
+from datetime import datetime
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")
+# ======= БАЛАНС =========
 
-# 📁 Файл с балансами
 if not os.path.exists("users.json"):
     with open("users.json", "w") as f:
         json.dump({}, f)
@@ -49,63 +49,84 @@ def save_users(users):
 
 def get_balance(user_id):
     users = load_users()
-    return users.get(str(user_id), 1000)  # начальный баланс 1000
+    return users.get(str(user_id), 1000)
 
 def update_balance(user_id, new_balance):
     users = load_users()
     users[str(user_id)] = new_balance
     save_users(users)
 
-# 📊 Показать баланс
-@bot.message_handler(commands=['profile'])
-def profile(message):
-    balance = get_balance(message.from_user.id)
-    bot.send_message(message.chat.id, f"💼 Твой баланс: {balance}₽")
+# ======= КОМАНДА /profile =======
 
-# 🎰 Казино - просит ставку
-@bot.message_handler(commands=['casino'])
-def casino(message):
-    msg = bot.send_message(message.chat.id, "💰 Введи сумму ставки:")
-    bot.register_next_step_handler(msg, play_casino)
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    balance = get_balance(user_id)
+    await update.message.reply_text(f"💼 Твой баланс: {balance}₽")
 
-# 🎲 Игра
-def play_casino(message):
-    user_id = message.from_user.id
-    try:
-        bet = int(message.text)
-        balance = get_balance(user_id)
-        if bet <= 0:
-            bot.send_message(message.chat.id, "❌ Ставка должна быть больше 0.")
-            return
-        if bet > balance:
-            bot.send_message(message.chat.id, "❌ У тебя недостаточно денег.")
-            return
+# ======= КОМАНДА /casino =======
 
-        symbols = ['🍒', '🍋', '💎', '7️⃣', '🔔']
-        s1 = random.choice(symbols)
-        s2 = random.choice(symbols)
-        s3 = random.choice(symbols)
-        result = f"{s1} | {s2} | {s3}"
+async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("💰 Введи сумму ставки:")
 
-        if s1 == s2 == s3:
-            win = bet * 3
-            balance += win
-            text = f"🎉 Ты выиграл {win}₽!\n{result}"
-        else:
-            balance -= bet
-            text = f"😢 Ты проиграл {bet}₽.\n{result}"
+    return await context.user_data.update({"waiting_bet": True})
 
-        update_balance(user_id, balance)
+# ======= ОБРАБОТКА ЧИСЛА =======
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🎰 Играть снова", callback_data="casino_again"))
-        bot.send_message(message.chat.id, f"{text}\n💼 Баланс: {balance}₽", reply_markup=markup)
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("waiting_bet"):
+        user_id = update.message.from_user.id
+        try:
+            bet = int(update.message.text)
+            balance = get_balance(user_id)
 
-    except ValueError:
-        bot.send_message(message.chat.id, "❌ Введи число.")
+            if bet <= 0:
+                await update.message.reply_text("❌ Ставка должна быть больше 0.")
+                return
+            if bet > balance:
+                await update.message.reply_text("❌ У тебя недостаточно денег.")
+                return
 
-# 🔁 Повторить игру
-@bot.callback_query_handler(func=lambda c: c.data == "casino_again")
-def again_callback(c):
-    casino(c.message)
+            symbols = ['🍒', '🍋', '💎', '7️⃣', '🔔']
+            s1, s2, s3 = random.choices(symbols, k=3)
+            result = f"{s1} | {s2} | {s3}"
 
+            if s1 == s2 == s3:
+                win = bet * 3
+                balance += win
+                text = f"🎉 Ты выиграл {win}₽!\n{result}"
+            else:
+                balance -= bet
+                text = f"😢 Ты проиграл {bet}₽.\n{result}"
+
+            update_balance(user_id, balance)
+
+            markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🎰 Играть снова", callback_data="casino_again")]
+            ])
+
+            await update.message.reply_text(f"{text}\n💼 Баланс: {balance}₽", reply_markup=markup)
+            context.user_data["waiting_bet"] = False
+
+        except ValueError:
+            await update.message.reply_text("❌ Введи число.")
+    else:
+        await update.message.reply_text("⚠️ Неизвестная команда. Напиши /casino чтобы начать игру.")
+
+# ======= КНОПКА "ИГРАТЬ СНОВА" =======
+
+async def casino_again(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data["waiting_bet"] = True
+    await query.message.reply_text("💰 Введи сумму ставки:")
+
+# ======= ЗАПУСК БОТА =======
+
+app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+
+app.add_handler(CommandHandler("profile", profile))
+app.add_handler(CommandHandler("casino", casino))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(CallbackQueryHandler(casino_again, pattern="casino_again"))
+
+app.run_polling()
