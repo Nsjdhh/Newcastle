@@ -1,132 +1,125 @@
-import os
-import sys
 import telebot
-
-# ✅ Вывод токена из переменной окружения (для отладки)
-print("BOT_TOKEN из окружения:", os.environ.get("BOT_TOKEN"))
-
-# Получение токена из окружения
-token = os.environ.get("BOT_TOKEN")
-
-# Проверка: если токена нет — выводим ошибку
-if not token:
-    print("❌ Переменная BOT_TOKEN не задана! Проверь Environment в Render.")
-    sys.exit(1)
-
-# Проверка: если есть пробелы в токене — ошибка
-if any(char.isspace() for char in token):
-    print("❌ BOT_TOKEN содержит пробелы! Удали лишние символы.")
-    sys.exit(1)
-
-# Создаём бота
-bot = telebot.TeleBot(token)
-
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, "✅ Бот работает!")
-
-# Запускаем бота
-bot.polling() import os
+from telebot import types
 import json
-import random
-from datetime import datetime
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+import os
 
-# ======= БАЛАНС =========
+bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")  # ЗАМЕНИ на свой токен от BotFather
 
-if not os.path.exists("users.json"):
-    with open("users.json", "w") as f:
-        json.dump({}, f)
-
+# --- Функции работы с пользователями ---
 def load_users():
+    if not os.path.exists("users.json"):
+        with open("users.json", "w") as f:
+            json.dump({}, f)
     with open("users.json", "r") as f:
         return json.load(f)
 
-def save_users(users):
+def save_users(data):
     with open("users.json", "w") as f:
-        json.dump(users, f)
+        json.dump(data, f)
 
-def get_balance(user_id):
+def get_user(uid):
     users = load_users()
-    return users.get(str(user_id), 1000)
+    return users.get(str(uid), {"balance": 5000000, "cars": []})
 
-def update_balance(user_id, new_balance):
+def update_user(uid, data):
     users = load_users()
-    users[str(user_id)] = new_balance
+    users[str(uid)] = data
     save_users(users)
 
-# ======= КОМАНДА /profile =======
+# --- Автосалон (машины) ---
+cars = {
+    "BMW": [
+        {
+            "model": "M5 F90",
+            "price": 8000000,
+            "photo": "https://i.imgur.com/xULvLWh.jpg"
+        },
+        {
+            "model": "X6 M",
+            "price": 9000000,
+            "photo": "https://i.imgur.com/EWa1G8J.jpg"
+        }
+    ],
+    "Mercedes": [
+        {
+            "model": "S600",
+            "price": 10000000,
+            "photo": "https://i.imgur.com/PKX3UTk.jpg"
+        }
+    ],
+    "Toyota": [
+        {
+            "model": "Camry",
+            "price": 3000000,
+            "photo": "https://i.imgur.com/htqTXuO.jpg"
+        }
+    ]
+}
 
-async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    balance = get_balance(user_id)
-    await update.message.reply_text(f"💼 Твой баланс: {balance}₽")
+# --- Команды ---
+@bot.message_handler(commands=["start", "профиль"])
+def profile(message):
+    user = get_user(message.from_user.id)
+    bot.send_message(message.chat.id, f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽")
 
-# ======= КОМАНДА /casino =======
-
-async def casino(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💰 Введи сумму ставки:")
-
-    return await context.user_data.update({"waiting_bet": True})
-
-# ======= ОБРАБОТКА ЧИСЛА =======
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("waiting_bet"):
-        user_id = update.message.from_user.id
-        try:
-            bet = int(update.message.text)
-            balance = get_balance(user_id)
-
-            if bet <= 0:
-                await update.message.reply_text("❌ Ставка должна быть больше 0.")
-                return
-            if bet > balance:
-                await update.message.reply_text("❌ У тебя недостаточно денег.")
-                return
-
-            symbols = ['🍒', '🍋', '💎', '7️⃣', '🔔']
-            s1, s2, s3 = random.choices(symbols, k=3)
-            result = f"{s1} | {s2} | {s3}"
-
-            if s1 == s2 == s3:
-                win = bet * 3
-                balance += win
-                text = f"🎉 Ты выиграл {win}₽!\n{result}"
-            else:
-                balance -= bet
-                text = f"😢 Ты проиграл {bet}₽.\n{result}"
-
-            update_balance(user_id, balance)
-
-            markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🎰 Играть снова", callback_data="casino_again")]
-            ])
-
-            await update.message.reply_text(f"{text}\n💼 Баланс: {balance}₽", reply_markup=markup)
-            context.user_data["waiting_bet"] = False
-
-        except ValueError:
-            await update.message.reply_text("❌ Введи число.")
+@bot.message_handler(commands=["гараж"])
+def garage(message):
+    user = get_user(message.from_user.id)
+    if not user["cars"]:
+        bot.send_message(message.chat.id, "🚗 У тебя нет машин.")
     else:
-        await update.message.reply_text("⚠️ Неизвестная команда. Напиши /casino чтобы начать игру.")
+        cars_text = "\n".join(user["cars"])
+        bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars_text}")
 
-# ======= КНОПКА "ИГРАТЬ СНОВА" =======
+@bot.message_handler(commands=["автосалон"])
+def show_brands(message):
+    markup = types.InlineKeyboardMarkup()
+    for brand in cars:
+        markup.add(types.InlineKeyboardButton(brand, callback_data=f"brand_{brand}"))
+    bot.send_message(message.chat.id, "🚗 Выбери марку машины:", reply_markup=markup)
 
-async def casino_again(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    context.user_data["waiting_bet"] = True
-    await query.message.reply_text("💰 Введи сумму ставки:")
+@bot.callback_query_handler(func=lambda c: c.data.startswith("brand_"))
+def show_models(callback):
+    brand = callback.data.split("_")[1]
+    markup = types.InlineKeyboardMarkup()
+    for car in cars[brand]:
+        model = car["model"]
+        price = car["price"]
+        cb_data = f"buy_{brand}_{model.replace(' ', '_')}"
+        markup.add(types.InlineKeyboardButton(f"{model} — {price}₽", callback_data=cb_data))
+    bot.edit_message_text(f"🚘 Модели {brand}:", callback.message.chat.id, callback.message.message_id, reply_markup=markup)
 
-# ======= ЗАПУСК БОТА =======
+@bot.callback_query_handler(func=lambda c: c.data.startswith("buy_"))
+def show_car(callback):
+    _, brand, model_raw = callback.data.split("_", 2)
+    model = model_raw.replace("_", " ")
+    car = next((c for c in cars[brand] if c["model"] == model), None)
+    if not car:
+        bot.answer_callback_query(callback.id, "❌ Машина не найдена")
+        return
+    caption = f"🚘 {brand} {model}\n💰 Цена: {car['price']}₽"
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("✅ Купить", callback_data=f"confirm_{brand}_{model_raw}"))
+    bot.send_photo(callback.message.chat.id, car["photo"], caption=caption, reply_markup=markup)
 
-app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+@bot.callback_query_handler(func=lambda c: c.data.startswith("confirm_"))
+def buy_car(callback):
+    _, brand, model_raw = callback.data.split("_", 2)
+    model = model_raw.replace("_", " ")
+    car = next((c for c in cars[brand] if c["model"] == model), None)
+    if not car:
+        bot.answer_callback_query(callback.id, "❌ Машина не найдена")
+        return
 
-app.add_handler(CommandHandler("profile", profile))
-app.add_handler(CommandHandler("casino", casino))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.add_handler(CallbackQueryHandler(casino_again, pattern="casino_again"))
+    user = get_user(callback.from_user.id)
+    if user["balance"] < car["price"]:
+        bot.answer_callback_query(callback.id, "❌ Недостаточно средств")
+        return
 
-app.run_polling()
+    user["balance"] -= car["price"]
+    user["cars"].append(f"{brand} {model}")
+    update_user(callback.from_user.id, user)
+    bot.send_message(callback.message.chat.id, f"✅ Ты купил {brand} {model}!\n💼 Остаток: {user['balance']}₽")
+
+# --- Запуск бота ---
+bot.polling()
