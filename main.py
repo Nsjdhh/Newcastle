@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 
 bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")
-CHANNEL_USERNAME = "https://t.me/newcastlecity1"  # укажи юзернейм канала с @
+CHANNEL_USERNAME = "@newcastlecity1"  # укажи юзернейм канала с @
 
 def is_subscribed(user_id):
     try:
