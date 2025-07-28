@@ -140,3 +140,6 @@ def buy_car(callback):
 
 # === СТАРТ БОТА ===
 bot.polling(none_stop=True)
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.send_message(message.chat.id, "✅ Добро пожаловать на Newcastle City! 🚗")
