@@ -146,4 +146,4 @@ def buy_car(c):
         message_id=c.message.message_id
     )
 
-bot.polling()
+bot.polling(none_stop=True)
