@@ -137,9 +137,21 @@ def buy_car(callback):
 
     bot.answer_callback_query(callback.id, f"✅ Куплено: {brand} {model} за {price}₽")
     bot.send_message(callback.message.chat.id, f"🚗 Ты купил {brand} {model}!\n💼 Остаток: {user['balance']}₽")
+import telebot
 
-# === СТАРТ БОТА ===
-bot.polling(none_stop=True)
+bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")
+
+# 🔹 Команда /start
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "✅ Добро пожаловать на Newcastle City! 🚗")
+    bot.send_message(message.chat.id, "👋 Привет! Я бот.")
+
+# 🔹 Команда /myid — показывает твой Telegram ID
+@bot.message_handler(commands=['myid'])
+def myid(message):
+    user_id = message.from_user.id
+    bot.send_message(message.chat.id, f"🆔 Твой Telegram ID: {user_id}")
+
+# 🔹 Не забудь polling
+
+# === СТАРТ БОТА ===
