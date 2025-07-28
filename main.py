@@ -1,236 +1,59 @@
-import telebot
-from telebot import types
-import json
-import os
-
-bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")
-CHANNEL_USERNAME = "@newcastlecity1"
-
-# === БАЗА ДАННЫХ (ФАЙЛЫ) ===
-if not os.path.exists("users.json"):
-    with open("users.json", "w") as f:
-        json.dump({}, f)
-
-def load_users():
-    with open("users.json", "r") as f:
-        return json.load(f)
-
-def save_users(users):
-    with open("users.json", "w") as f:
-        json.dump(users, f)
-
-def get_user(user_id):
-    users = load_users()
-    user_id = str(user_id)
-    if user_id not in users:
-        users[user_id] = {"balance": 1000, "cars": []}
-        save_users(users)
-    return users[user_id]
-
-def update_user(user_id, data):
-    users = load_users()
-    users[str(user_id)] = data
-    save_users(users)
-
-# === ПРОВЕРКА ПОДПИСКИ ===
-def is_subscribed(user_id):
-    try:
-        member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        return member.status in ['member', 'administrator', 'creator']
-    except Exception:
-        return False
-
-# === КОМАНДА /START ===
-@bot.message_handler(commands=['start'])
-def start(message):
-    if not is_subscribed(message.from_user.id):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🔔 Подписаться", url=f"https://t.me/{CHANNEL_USERNAME[1:]}"))
-        markup.add(types.InlineKeyboardButton("✅ Проверить подписку", callback_data="check_sub"))
-        bot.send_message(message.chat.id, "❗ Подпишись на канал для доступа к боту.", reply_markup=markup)
-        return
-
-    # Главное меню
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("🚗 Автосалон", "🚘 Гараж")
-    markup.row("💼 Профиль")
-
-    user = get_user(message.from_user.id)
-    bot.send_message(
-        message.chat.id,
-        f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽",
-        reply_markup=markup
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data == "check_sub")
-def check_sub(c):
-    if is_subscribed(c.from_user.id):
-        bot.delete_message(c.message.chat.id, c.message.message_id)
-        start(c.message)
-    else:
-        bot.answer_callback_query(c.id, "❌ Подпишись сначала!")
-
-# === СЛОВАРЬ МАШИН ===
-cars = {
-    "BMW": [
-        {"model": "BMW M5", "price": 500},
-        {"model": "BMW X6", "price": 700}
-    ],
-    "Mercedes": [
-        {"model": "Mercedes E63", "price": 800},
-        {"model": "Mercedes GLE", "price": 1000}
-    ]
-}
-
-# === МЕНЮ ===
-@bot.message_handler(func=lambda msg: msg.text in ["🚗 Автосалон", "🚘 Гараж", "💼 Профиль"])
-def menu(msg):
-    user = get_user(msg.from_user.id)
-
-    if msg.text == "🚗 Автосалон":
-        markup = types.InlineKeyboardMarkup()
-        for brand in cars:
-            markup.add(types.InlineKeyboardButton(brand, callback_data=f"brand_{brand}"))
-        bot.send_message(msg.chat.id, "Выбери марку:", reply_markup=markup)
-
-    elif msg.text == "🚘 Гараж":
-        if not user["cars"]:
-            bot.send_message(msg.chat.id, "🚘 У тебя нет машин.")
-        else:
-            text = "🚘 Твой гараж:\n" + "\n".join(user["cars"])
-            bot.send_message(msg.chat.id, text)
-
-    elif msg.text == "💼 Профиль":
-        bot.send_message(msg.chat.id, f"👤 {msg.from_user.first_name}\n💰 Баланс: {user['balance']}₽")
-
-# === ВЫБОР МАРКИ ===
-@bot.callback_query_handler(func=lambda c: c.data.startswith("brand_"))
-def show_models(c):
-    brand = c.data.split("_")[1]
-    markup = types.InlineKeyboardMarkup()
-    for car in cars[brand]:
-        cb_data = f"buy_{brand}_{car['model'].replace(' ', '_')}"
-        markup.add(types.InlineKeyboardButton(f"{car['model']} - {car['price']}₽", callback_data=cb_data))
-    bot.edit_message_text(
-        f"🚗 {brand} — выбери модель:",
-        chat_id=c.message.chat.id,
-        message_id=c.message.message_id,
-        reply_markup=markup
-    ) 
-# === ПОКУПКА ===
-@bot.callback_query_handler(func=lambda c: c.data.startswith("buy_"))
-def buy_car(c):
-    parts = c.data.split("_")
-    brand = parts[1]
-    model = " ".join(parts[2:])
-    car_data = next((car for car in cars[brand] if car["model"] == model), None)
-
-    if not car_data:
-        bot.answer_callback_query(c.id, "Машина не найдена.")
-        return
-
-    user = get_user(c.from_user.id)
-
-    if user["balance"] < car_data["price"]:
-        bot.answer_callback_query(c.id, "❌ Недостаточно средств.")
-        return
-
-    user["balance"] -= car_data["price"]
-    user["cars"].append(f"{brand} {model}")
-    update_user(c.from_user.id, user)
-
-    bot.edit_message_text(
-        f"✅ Ты купил {brand} {model} за {car_data['price']}₽!\n"
-        f"💼 Новый баланс: {user['balance']}₽",
-        chat_id=c.message.chat.id,
-        message_id=c.message.message_id
-    )
 import telebot from telebot import types import json import os
 
-bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")  # ЗАМЕНИ НА СВОЙ ТОКЕН
+TOKEN = "8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds"  # ЗАМЕНИ на свой токен бота bot = telebot.TeleBot(TOKEN)
 
-====== Работа с данными пользователей ======
+====== База пользователей ======
 
-def load_users(): if not os.path.exists("users.json"): with open("users.json", "w") as f: json.dump({}, f) with open("users.json", "r") as f: return json.load(f)
+if not os.path.exists("users.json"): with open("users.json", "w") as f: json.dump({}, f)
 
-def save_users(users): with open("users.json", "w") as f: json.dump(users, f)
+def load_users(): with open("users.json", "r") as f: return json.load(f)
 
-def get_user(user_id): users = load_users() user = users.get(str(user_id)) if not user: users[str(user_id)] = { "balance": 1000, "cars": [], "faction": None } save_users(users) user = users[str(user_id)] return user
+def save_users(users): with open("users.json", "w") as f: json.dump(users, f, indent=4)
 
-def update_user(user_id, user_data): users = load_users() users[str(user_id)] = user_data save_users(users)
+def get_user(user_id): users = load_users() user_id = str(user_id) if user_id not in users: users[user_id] = {"balance": 0, "cars": []} save_users(users) return users[user_id]
 
-========== Команды и меню ==========
+def update_user(user_id, data): users = load_users() users[str(user_id)] = data save_users(users)
 
-@bot.message_handler(commands=["start"]) def start(message): user = get_user(message.from_user.id) markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль", "📘 Фракция") bot.send_message(message.chat.id, f"👋 Привет, ты попал в игру Newcastle City!", reply_markup=markup)
+====== Список машин ======
 
-@bot.message_handler(func=lambda msg: msg.text == "💼 Профиль") def profile(message): user = get_user(message.from_user.id) bot.send_message(message.chat.id, f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽")
+cars = { "BMW": [ {"model": "BMW X5", "price": 6000000, "photo": "https://cdn.motor1.com/images/mgl/0ANM8/s3/bmw-x5-m.jpg"}, {"model": "BMW M5", "price": 9000000, "photo": "https://cdn.bmwblog.com/wp-content/uploads/2021/06/2021-bmw-m5-competition-test-drive-35.jpg"}, {"model": "BMW i8", "price": 12000000, "photo": "https://cdn.motor1.com/images/mgl/W6r1v/s3/bmw-i8.jpg"} ], "Mercedes-Benz": [ {"model": "E-Class", "price": 6500000, "photo": "https://www.mercedes-benz.ru/passengercars/mercedes-benz-cars/models/e-class/sedan-v213/image-gallery/_jcr_content/media_gallery_container/par/media_gallery_item/image.MQ6.0.20230110132739.jpeg"}, {"model": "G63 AMG", "price": 16000000, "photo": "https://wroom.ru/i/cars2/mercedes_g63_amg_1.jpg"}, {"model": "S-Class", "price": 14000000, "photo": "https://upload.wikimedia.org/wikipedia/commons/f/f7/2018_Mercedes-Benz_S_560_4MATIC.jpg"} ], "Toyota": [ {"model": "Camry", "price": 3000000, "photo": "https://avatars.mds.yandex.net/get-autoru-vos/2039318/2f8b44a0b1c8f74c1fd2f4b42e0208f2/1200x900"}, {"model": "Land Cruiser 300", "price": 11500000, "photo": "https://upload.wikimedia.org/wikipedia/commons/0/05/Toyota_Land_Cruiser_300_2021.jpg"}, {"model": "Supra", "price": 8000000, "photo": "https://www.toyota.com/imgix/responsive/images/mlp/colorizer/2021/supra/3W1/1.png"} ], "Audi": [ {"model": "Audi A6", "price": 5500000, "photo": "https://cdn.motor1.com/images/mgl/l0R6z/s3/2021-audi-a6-sedan.jpg"}, {"model": "Audi RS6", "price": 12000000, "photo": "https://cdn.motor1.com/images/mgl/1M0k3/s3/2020-audi-rs6-avant.jpg"} ], "Lamborghini": [ {"model": "Huracan", "price": 23000000, "photo": "https://cdn.motor1.com/images/mgl/0ANM8/s3/lamborghini-huracan.jpg"}, {"model": "Aventador", "price": 40000000, "photo": "https://cdn.motor1.com/images/mgl/BZ3B7/s3/lamborghini-aventador-svj.jpg"} ], "Porsche": [ {"model": "911 Turbo", "price": 19000000, "photo": "https://cdn.motor1.com/images/mgl/Xe0Ae/s3/porsche-911-turbo.jpg"}, {"model": "Cayenne", "price": 11000000, "photo": "https://cdn.motor1.com/images/mgl/y3xr7/s3/2023-porsche-cayenne.jpg"} ] }
 
-@bot.message_handler(func=lambda msg: msg.text == "🚘 Гараж") def garage(message): user = get_user(message.from_user.id) if not user["cars"]: bot.send_message(message.chat.id, "🚗 У тебя нет машин.") else: cars_text = "\n".join(user["cars"]) bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars_text}")
+====== /start ======
 
-========== Фракции ==========
+@bot.message_handler(commands=["start"]) def start(message): user = get_user(message.from_user.id) markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль") bot.send_message( message.chat.id, "👋 Добро пожаловать в КРМП проект - бот Newcastle City!🗿Выбери действие:", reply_markup=markup )
 
-@bot.message_handler(func=lambda msg: msg.text == "📘 Фракция") def faction_menu(message): user = get_user(message.from_user.id) faction = user.get("faction") if not faction: return bot.send_message(message.chat.id, "❌ Ты не состоишь во фракции.")
+====== Профиль ======
 
-text = f"📘 Фракция: {faction['name']}\n🎖 Ранг: {faction['rank']}"
+@bot.message_handler(func=lambda message: message.text == "💼 Профиль") def profile(message): user = get_user(message.from_user.id) bot.send_message(message.chat.id, f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽")
 
-if faction.get("is_leader"):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("📥 Пригласить", "🔼 Повысить", "🔽 Понизить")
-    markup.row("👥 Участники", "🔙 Назад")
-    return bot.send_message(message.chat.id, "👑 Панель лидера", reply_markup=markup)
-else:
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("🔙 Назад")
-    return bot.send_message(message.chat.id, text, reply_markup=markup)
+====== Гараж ======
 
-@bot.message_handler(func=lambda msg: msg.text == "👥 Участники") def show_faction_members(message): user = get_user(message.from_user.id) if not user.get("faction"): return
+@bot.message_handler(func=lambda message: message.text == "🚘 Гараж") def garage(message): user = get_user(message.from_user.id) if not user["cars"]: bot.send_message(message.chat.id, "🚗 У тебя нет машин.") else: text = "\n".join(user["cars"]) bot.send_message(message.chat.id, f"🧾 Твои машины:\n{text}")
 
-faction_name = user["faction"]["name"]
-users = load_users()
-text = f"👥 Участники фракции {faction_name}:\n"
+====== Автосалон ======
+@bot.message_handler(func=lambda message: message.text == "🚗 Автосалон") def show_brands(message): markup = types.InlineKeyboardMarkup() for brand in cars: markup.add(types.InlineKeyboardButton(brand, callback_data=f"brand_{brand}")) bot.send_message(message.chat.id, "🚘 Выбери марку автомобиля:", reply_markup=markup)
 
-for uid, u in users.items():
-    f = u.get("faction")
-    if f and f["name"] == faction_name:
-        mark = "👑" if f.get("is_leader") else ""
-        text += f"{mark} {uid} — ранг {f['rank']}\n"
+@bot.callback_query_handler(func=lambda c: c.data.startswith("brand_")) def show_models(callback): brand = callback.data.split("", 1)[1] markup = types.InlineKeyboardMarkup() for car in cars[brand]: model = car["model"] price = car["price"] cb_data = f"buy{brand}{model.replace(' ', '')}" markup.add(types.InlineKeyboardButton(f"{model} — {price}₽", callback_data=cb_data)) bot.edit_message_text(f"📍 {brand}: выбери модель", callback.message.chat.id, callback.message.message_id, reply_markup=markup)
 
-bot.send_message(message.chat.id, text)
+@bot.callback_query_handler(func=lambda c: c.data.startswith("buy_")) def buy_car(callback): , brand, raw_model = callback.data.split("", 2) model = raw_model.replace("_", " ") user_id = str(callback.from_user.id) user = get_user(user_id)
 
-@bot.message_handler(func=lambda msg: msg.text in ["📥 Пригласить", "🔼 Повысить", "🔽 Понизить"]) def handle_leader_actions(message): action = message.text prompt = { "📥 Пригласить": "📩 Введи ID пользователя для приглашения:", "🔼 Повысить": "📈 Введи ID кого повысить:", "🔽 Понизить": "📉 Введи ID кого понизить:" }[action] msg = bot.send_message(message.chat.id, prompt) bot.register_next_step_handler(msg, lambda m: process_leader_action(m, action))
+car = next((c for c in cars[brand] if c["model"] == model), None)
+if not car:
+    return bot.send_message(callback.message.chat.id, "❌ Автомобиль не найден.")
 
-def process_leader_action(message, action): user = get_user(message.from_user.id) if not user.get("faction") or not user["faction"].get("is_leader"): return bot.send_message(message.chat.id, "❌ Ты не лидер.")
+if car["price"] > user["balance"]:
+    return bot.send_message(callback.message.chat.id, "💸 Недостаточно средств.")
 
-try:
-    target_id = int(message.text)
-    target = get_user(target_id)
+if model in user["cars"]:
+    return bot.send_message(callback.message.chat.id, "🚘 У тебя уже есть этот автомобиль.")
 
-    if not target:
-        return bot.send_message(message.chat.id, "❌ Игрок не найден.")
-        if action == "📥 Пригласить":
-        target["faction"] = {
-            "name": user["faction"]["name"],
-            "rank": 1,
-            "is_leader": False
-        }
-        update_user(target_id, target)
-        return bot.send_message(message.chat.id, "✅ Приглашён.")
+user["balance"] -= car["price"]
+user["cars"].append(model)
+update_user(user_id, user)
 
-    if target["faction"]["name"] != user["faction"]["name"]:
-        return bot.send_message(message.chat.id, "❌ Не из твоей фракции.")
+bot.send_photo(callback.message.chat.id, car["photo"],
+    caption=f"🎉 Ты купил {brand} {model} за {car['price']}₽!\n💼 Новый баланс: {user['balance']}₽")
 
-    if action == "🔼 Повысить":
-        target["faction"]["rank"] += 1
-    elif action == "🔽 Понизить":
-        target["faction"]["rank"] = max(1, target["faction"]["rank"] - 1)
+====== Запуск ======
 
-    update_user(target_id, target)
-    bot.send_message(message.chat.id, "✅ Ранг обновлён.")
-
-except:
-    bot.send_message(message.chat.id, "❌ Введи корректный ID.")
-
-@bot.message_handler(func=lambda msg: msg.text == "🔙 Назад") def back_to_main(message): markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль", "📘 Фракция") bot.send_message(message.chat.id, "🔙 Главное меню", reply_markup=markup)
-
-Запуск бота
 bot.polling(none_stop=True)
