@@ -1,4 +1,8 @@
-import telebot from telebot import types import json import os
+import telebot
+from telebot 
+import types 
+import json 
+import os
 
 TOKEN = "8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds"  # ЗАМЕНИ на свой токен бота bot = telebot.TeleBot(TOKEN)
 
@@ -20,7 +24,7 @@ cars = { "BMW": [ {"model": "BMW X5", "price": 6000000, "photo": "https://cdn.mo
 
 ====== /start ======
 
-@bot.message_handler(commands=["start"]) def start(message): user = get_user(message.from_user.id) markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль") bot.send_message( message.chat.id, "👋 Добро пожаловать в КРМП проект - бот Newcastle City!🗿Выбери действие:", reply_markup=markup )
+@bot.message_handler(commands=["start"]) def start(message): user = get_user(message.from_user.id) markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль") bot.send_message( message.chat.id, "👋 Добро пожаловать в КРМП проект - бот Newcastle City!\n🎯 В будущем тут будет квест!\nВыбери действие:", reply_markup=markup )
 
 ====== Профиль ======
 
@@ -31,6 +35,7 @@ cars = { "BMW": [ {"model": "BMW X5", "price": 6000000, "photo": "https://cdn.mo
 @bot.message_handler(func=lambda message: message.text == "🚘 Гараж") def garage(message): user = get_user(message.from_user.id) if not user["cars"]: bot.send_message(message.chat.id, "🚗 У тебя нет машин.") else: text = "\n".join(user["cars"]) bot.send_message(message.chat.id, f"🧾 Твои машины:\n{text}")
 
 ====== Автосалон ======
+
 @bot.message_handler(func=lambda message: message.text == "🚗 Автосалон") def show_brands(message): markup = types.InlineKeyboardMarkup() for brand in cars: markup.add(types.InlineKeyboardButton(brand, callback_data=f"brand_{brand}")) bot.send_message(message.chat.id, "🚘 Выбери марку автомобиля:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("brand_")) def show_models(callback): brand = callback.data.split("", 1)[1] markup = types.InlineKeyboardMarkup() for car in cars[brand]: model = car["model"] price = car["price"] cb_data = f"buy{brand}{model.replace(' ', '')}" markup.add(types.InlineKeyboardButton(f"{model} — {price}₽", callback_data=cb_data)) bot.edit_message_text(f"📍 {brand}: выбери модель", callback.message.chat.id, callback.message.message_id, reply_markup=markup)
@@ -57,3 +62,4 @@ bot.send_photo(callback.message.chat.id, car["photo"],
 ====== Запуск ======
 
 bot.polling(none_stop=True)
+
