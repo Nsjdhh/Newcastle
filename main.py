@@ -155,3 +155,4 @@ def myid(message):
 # 🔹 Не забудь polling
 
 # === СТАРТ БОТА ===
+bot.polling(none_stop=True)
