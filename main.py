@@ -145,5 +145,92 @@ def buy_car(c):
         chat_id=c.message.chat.id,
         message_id=c.message.message_id
     )
+import telebot from telebot import types import json import os
 
+bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")  # ЗАМЕНИ НА СВОЙ ТОКЕН
+
+====== Работа с данными пользователей ======
+
+def load_users(): if not os.path.exists("users.json"): with open("users.json", "w") as f: json.dump({}, f) with open("users.json", "r") as f: return json.load(f)
+
+def save_users(users): with open("users.json", "w") as f: json.dump(users, f)
+
+def get_user(user_id): users = load_users() user = users.get(str(user_id)) if not user: users[str(user_id)] = { "balance": 1000, "cars": [], "faction": None } save_users(users) user = users[str(user_id)] return user
+
+def update_user(user_id, user_data): users = load_users() users[str(user_id)] = user_data save_users(users)
+
+========== Команды и меню ==========
+
+@bot.message_handler(commands=["start"]) def start(message): user = get_user(message.from_user.id) markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль", "📘 Фракция") bot.send_message(message.chat.id, f"👋 Привет, ты попал в игру Newcastle City!", reply_markup=markup)
+
+@bot.message_handler(func=lambda msg: msg.text == "💼 Профиль") def profile(message): user = get_user(message.from_user.id) bot.send_message(message.chat.id, f"👤 {message.from_user.first_name}\n💼 Баланс: {user['balance']}₽")
+
+@bot.message_handler(func=lambda msg: msg.text == "🚘 Гараж") def garage(message): user = get_user(message.from_user.id) if not user["cars"]: bot.send_message(message.chat.id, "🚗 У тебя нет машин.") else: cars_text = "\n".join(user["cars"]) bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars_text}")
+
+========== Фракции ==========
+
+@bot.message_handler(func=lambda msg: msg.text == "📘 Фракция") def faction_menu(message): user = get_user(message.from_user.id) faction = user.get("faction") if not faction: return bot.send_message(message.chat.id, "❌ Ты не состоишь во фракции.")
+
+text = f"📘 Фракция: {faction['name']}\n🎖 Ранг: {faction['rank']}"
+
+if faction.get("is_leader"):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("📥 Пригласить", "🔼 Повысить", "🔽 Понизить")
+    markup.row("👥 Участники", "🔙 Назад")
+    return bot.send_message(message.chat.id, "👑 Панель лидера", reply_markup=markup)
+else:
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("🔙 Назад")
+    return bot.send_message(message.chat.id, text, reply_markup=markup)
+
+@bot.message_handler(func=lambda msg: msg.text == "👥 Участники") def show_faction_members(message): user = get_user(message.from_user.id) if not user.get("faction"): return
+
+faction_name = user["faction"]["name"]
+users = load_users()
+text = f"👥 Участники фракции {faction_name}:\n"
+
+for uid, u in users.items():
+    f = u.get("faction")
+    if f and f["name"] == faction_name:
+        mark = "👑" if f.get("is_leader") else ""
+        text += f"{mark} {uid} — ранг {f['rank']}\n"
+
+bot.send_message(message.chat.id, text)
+
+@bot.message_handler(func=lambda msg: msg.text in ["📥 Пригласить", "🔼 Повысить", "🔽 Понизить"]) def handle_leader_actions(message): action = message.text prompt = { "📥 Пригласить": "📩 Введи ID пользователя для приглашения:", "🔼 Повысить": "📈 Введи ID кого повысить:", "🔽 Понизить": "📉 Введи ID кого понизить:" }[action] msg = bot.send_message(message.chat.id, prompt) bot.register_next_step_handler(msg, lambda m: process_leader_action(m, action))
+
+def process_leader_action(message, action): user = get_user(message.from_user.id) if not user.get("faction") or not user["faction"].get("is_leader"): return bot.send_message(message.chat.id, "❌ Ты не лидер.")
+
+try:
+    target_id = int(message.text)
+    target = get_user(target_id)
+
+    if not target:
+        return bot.send_message(message.chat.id, "❌ Игрок не найден.")
+        if action == "📥 Пригласить":
+        target["faction"] = {
+            "name": user["faction"]["name"],
+            "rank": 1,
+            "is_leader": False
+        }
+        update_user(target_id, target)
+        return bot.send_message(message.chat.id, "✅ Приглашён.")
+
+    if target["faction"]["name"] != user["faction"]["name"]:
+        return bot.send_message(message.chat.id, "❌ Не из твоей фракции.")
+
+    if action == "🔼 Повысить":
+        target["faction"]["rank"] += 1
+    elif action == "🔽 Понизить":
+        target["faction"]["rank"] = max(1, target["faction"]["rank"] - 1)
+
+    update_user(target_id, target)
+    bot.send_message(message.chat.id, "✅ Ранг обновлён.")
+
+except:
+    bot.send_message(message.chat.id, "❌ Введи корректный ID.")
+
+@bot.message_handler(func=lambda msg: msg.text == "🔙 Назад") def back_to_main(message): markup = types.ReplyKeyboardMarkup(resize_keyboard=True) markup.row("🚗 Автосалон", "🚘 Гараж") markup.row("💼 Профиль", "📘 Фракция") bot.send_message(message.chat.id, "🔙 Главное меню", reply_markup=markup)
+
+Запуск бота
 bot.polling(none_stop=True)
