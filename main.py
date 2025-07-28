@@ -4,7 +4,7 @@ import json
 import os
 
 bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")
-CHANNEL_USERNAME = "@newcastle1"
+CHANNEL_USERNAME = "@newcastlecity1"
 
 # === БАЗА ДАННЫХ (ФАЙЛЫ) ===
 if not os.path.exists("users.json"):
