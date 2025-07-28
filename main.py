@@ -155,4 +155,28 @@ def myid(message):
 # 🔹 Не забудь polling
 
 # === СТАРТ БОТА ===
+@bot.message_handler(commands=['setrank'])
+def set_rank(message):
+    user_id = str(message.from_user.id)
+    args = message.text.split()
+
+    if len(args) < 3:
+        bot.reply_to(message, "Пример: /setrank [user_id] [звание]")
+        return
+
+    target_id = args[1]
+    rank = ' '.join(args[2:])
+
+    # Найти фракцию, где отправитель лидер
+    for name, data in factions.items():
+        if data["leader_id"] == int(user_id):
+            if target_id in data["members"]:
+                data["members"][target_id] = rank
+                save_factions(factions)
+                bot.reply_to(message, f"Игроку {target_id} присвоено звание: {rank}")
+            else:
+                bot.reply_to(message, "Этот пользователь не в твоей фракции.")
+            return
+
+    bot.reply_to(message, "Ты не являешься лидером ни одной фракции.")
 bot.polling(none_stop=True)
