@@ -115,5 +115,6 @@ def garage(message):
     else:
         cars_list = "\n".join(user["cars"])
         bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars_list}")
+
 # ← ВНИМАНИЕ! Этот блок должен быть без отступов
 bot.polling(none_stop=True)
