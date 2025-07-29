@@ -107,7 +107,7 @@ def buy_car(call):
     bot.answer_callback_query(call.id, f"Вы успешно купили {brand} {model} за {price}₽!")
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                           text=f"🎉 Вы купили {brand} {model}!\n💰 Остаток баланса: {user['balance']}₽")
-    @bot.message_handler(func=lambda message: message.text == "🚘 Гараж")
+ @bot.message_handler(func=lambda message: message.text == "🚘 Гараж")
 def garage(message):
     user = get_user(message.from_user.id)
     if not user["cars"]:
@@ -115,6 +115,5 @@ def garage(message):
     else:
         cars_list = "\n".join(user["cars"])
         bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars_list}")
-
-# ВНИМАНИЕ: это должно быть ВНЕ функции
+# ← ВНИМАНИЕ! Этот блок должен быть без отступов
 bot.polling(none_stop=True)
