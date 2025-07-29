@@ -107,7 +107,7 @@ def buy_car(call):
     bot.answer_callback_query(call.id, f"Вы успешно купили {brand} {model} за {price}₽!")
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                           text=f"🎉 Вы купили {brand} {model}!\n💰 Остаток баланса: {user['balance']}₽")
- @bot.message_handler(func=lambda message: message.text == "🚘 Гараж")
+    @bot.message_handler(func=lambda message: message.text == "🚘 Гараж")
 def garage(message):
     user = get_user(message.from_user.id)
     if not user["cars"]:
