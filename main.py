@@ -1,98 +1,77 @@
-import telebot
-from telebot import types
-import json
 import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
+import requests
 
-bot = telebot.TeleBot("8045858681:AAE5X-WBhgFkwcKSvLfeHYWGqAWCB6RCdds")  # ЗАМЕНИ НА СВОЙ ТОКЕН
+# Используем токен из переменной окружения или напрямую
+API_TOKEN = os.getenv("API_TOKEN") or "7646694075:AAHT0lVmi2rDDoErrCfK6uqj7T9_p74AAvQ"
 
-# 📁 Инициализация users.json
-if not os.path.exists("users.json"):
-    with open("users.json", "w") as f:
-        json.dump({}, f)
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
 
-def load_users():
-    with open("users.json", "r") as f:
-        return json.load(f)
+# IP-адрес
+@dp.message_handler(commands=["ip"])
+async def handle_ip(message: types.Message):
+    ip = message.get_args()
+    if not ip:
+        await message.reply("❗ Используй: /ip 8.8.8.8")
+        return
 
-def save_users(users):
-    with open("users.json", "w") as f:
-        json.dump(users, f)
+    r = requests.get(f"https://ipinfo.io/{ip}/json")
+    data = r.json()
 
-def get_user(user_id):
-    users = load_users()
-    user_id = str(user_id)
-    if user_id not in users:
-        users[user_id] = {"balance": 0, "cars": [], "quests": {}}
-        save_users(users)
-    return users[user_id]
+    response = (
+        f"🌐 IP: {data.get('ip')}\n"
+        f"🏙 Город: {data.get('city')}\n"
+        f"🌍 Страна: {data.get('country')}\n"
+        f"🏢 Организация: {data.get('org')}\n"
+        f"📍 Локация: {data.get('loc')}"
+    )
+    await message.reply(response)
 
-def update_user(user_id, data):
-    users = load_users()
-    users[str(user_id)] = data
-    save_users(users)
+# Email
+@dp.message_handler(commands=["email"])
+async def handle_email(message: types.Message):
+    email = message.get_args()
+    if not email:
+        await message.reply("❗ Используй: /email example@gmail.com")
+        return
 
-# 🚀 Старт и приветствие
-@bot.message_handler(commands=["start"])
-def start(message):
-    get_user(message.from_user.id)  # регистрация, если новый игрок
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("🚗 Автосалон", "🚘 Гараж")
-    markup.row("💼 Профиль", "📜 Инфо", "🎯 Квест")
+    r = requests.get(f"https://emailrep.io/{email}")
+    if r.status_code != 200:
+        await message.reply("⚠️ Не удалось получить данные.")
+        return
 
-    bot.send_message(
-        message.chat.id,
-        "👋 Добро пожаловать в *Newcastle City* — ролевой проект по типу КРМП!\n\n"
-        "🎮 Здесь ты можешь покупать машины, выполнять квесты, вступать в фракции и развиваться.\n"
-        "💸 Валюта: *NC (Newcastle Coin)*\n"
-        "❗ Машины стоят от *5.000.000 NC* — без халявы, только честная игра.",
-        parse_mode="Markdown",
-        reply_markup=markup
+    data = r.json()
+    response = (
+        f"📧 Email: {email}\n"
+        f"Репутация: {data.get('reputation')}\n"
+        f"Проверен: {data.get('suspicious')}\n"
+        f"Присутствует в утечках: {data.get('references')}"
+    )
+    await message.reply(response)
+
+# Телефон (заглушка)
+@dp.message_handler(commands=["phone"])
+async def handle_phone(message: types.Message):
+    phone = message.get_args()
+    if not phone:
+        await message.reply("❗ Используй: /phone +71234567890")
+        return
+
+    # PhoneInfoga требует сервер, а тут простой ответ-заглушка
+    await message.reply(f"📱 Поиск по номеру телефона: {phone}\n(Нужен внешний сканер — позже добавим)")
+
+# Start
+@dp.message_handler(commands=["start"])
+async def start(message: types.Message):
+    await message.reply(
+        "👋 Привет! Я OSINT-бот.\n\n"
+        "📌 Команды:\n"
+        "/ip [IP]\n"
+        "/email [почта]\n"
+        "/phone [номер]"
     )
 
-# 💼 Профиль
-@bot.message_handler(func=lambda msg: msg.text == "💼 Профиль")
-def profile(message):
-    user = get_user(message.from_user.id)
-    bot.send_message(
-        message.chat.id,
-        f"👤 Игрок: {message.from_user.first_name}\n💰 Баланс: {user['balance']:,} NC"
-    )
-
-# 📜 Информация
-@bot.message_handler(func=lambda msg: msg.text == "📜 Инфо")
-def info(message):
-    bot.send_message(
-        message.chat.id,
-        "ℹ️ *Newcastle City* — это ролевой текстовый бот по типу КРМП.\n"
-        "Ты можешь покупать авто, развиваться, вступать в фракции и выполнять миссии.\n\n"
-        "🚗 Команды:\n"
-        "— Автосалон: Покупка машин\n"
-        "— Гараж: Просмотр машин\n"
-        "— Квест: Задания\n"
-        "— Профиль: Баланс и ник\n\n"
-        "💰 Валюта: *NC (Newcastle Coin)*",
-        parse_mode="Markdown"
-    )
-
-# 🎯 Квест (пока без награды)
-@bot.message_handler(func=lambda msg: msg.text == "🎯 Квест")
-def quest_handler(message):
-    user = get_user(message.from_user.id)
-    if user["quests"].get("intro"):
-        bot.send_message(message.chat.id, "✅ Ты уже прошёл вступление.")
-    else:
-        user["quests"]["intro"] = True
-        update_user(message.from_user.id, user)
-        bot.send_message(message.chat.id, "📜 Ты прошёл вводное обучение. Вперёд к развитию!")
-
-# 🚘 Гараж
-@bot.message_handler(func=lambda msg: msg.text == "🚘 Гараж")
-def garage(message):
-    user = get_user(message.from_user.id)
-    if not user["cars"]:
-        bot.send_message(message.chat.id, "🚗 У тебя пока нет машин.")
-    else:
-        cars = "\n".join(user["cars"])
-        bot.send_message(message.chat.id, f"🚘 Твой гараж:\n{cars}")
-
-bot.polling(none_stop=True)
+if __name__ == "__main__":
+    executor.start_polling(dp)
